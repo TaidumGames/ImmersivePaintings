@@ -10,11 +10,18 @@ import immersive_paintings.resources.ByteImage;
 import immersive_paintings.resources.Painting;
 import immersive_paintings.resources.ServerPaintingManager;
 import immersive_paintings.util.Utils;
+import net.luckperms.api.LuckPermsProvider;
+import net.luckperms.api.model.user.User;
+import net.luckperms.api.model.user.UserManager;
+import net.luckperms.api.query.QueryOptions;
+import net.luckperms.api.query.OptionKey;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
+import net.luckperms.api.LuckPerms;
+import org.apache.logging.log4j.Logger;
 
 import java.util.Objects;
 
@@ -38,11 +45,30 @@ public class RegisterPaintingRequest extends Message {
         b.writeNbt(painting);
     }
 
+    public boolean isPlayerInGroupOrHigher(PlayerEntity player, String groupName) {
+        Logger LOGGER = Main.LOGGER;
+        LOGGER.info("Checking if player is in group");
+        LuckPerms luckPerms = LuckPermsProvider.get();
+        if (luckPerms == null) {
+            return false;
+        }
+
+        UserManager userManager = luckPerms.getUserManager();
+        User user = userManager.getUser(player.getUuid());
+        if(user != null){
+            return user.resolveDistinctInheritedNodes(QueryOptions.defaultContextualOptions()).stream().anyMatch(node -> node.getKey().equals("group."+groupName));
+        }
+
+
+        return false;
+    }
     @Override
     public void receive(PlayerEntity e) {
+        Logger LOGGER = Main.LOGGER;
         ByteImage image = UploadPaintingRequest.uploadedImages.get(e.getUuidAsString());
-
-        if (!e.hasPermissionLevel(Config.getInstance().uploadPermissionLevel)) {
+        LOGGER.info("got image");
+        boolean hasPerms = isPlayerInGroupOrHigher(e, "donator-1");
+        if (hasPerms == false) {
             error("no_permission", e, null);
             return;
         }
